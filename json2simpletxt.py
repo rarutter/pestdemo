@@ -11,17 +11,24 @@ def main(args):
   files = sorted( glob.glob('%s/*.json' % '/tmp/dvmdostem/calibration/yearly/') )
   print "Found %s files." % (len(files)) 
 
+  data_file = files[-1]
+
+  if(args.targets_file is not None):
+    data_file = args.targets_file
+
   # Open the last file.
   # NOTE: May want to take average of last X files (years)??
-  with open(files[-1]) as f:
+  with open(data_file) as f:
     fdata = json.load(f)
   print "Writing simplified outputs to: %s" % (args.file) 
   with open(args.file, 'w') as f:
     f.write("Variable,Value\n")
     for i in range(0, 9):
       pftkey = 'PFT%i' % (i)
-      f.write('GPPAll%s,%s\n' % (i, fdata[pftkey]['GPPAll']))
+      f.write('GPPAllIN%s,%s\n' % (i, fdata[pftkey]['GPPAllIgnoringNitrogen']))
+      f.write('NPPAllIN%s,%s\n' % (i, fdata[pftkey]['NPPAllIgnoringNitrogen']))
       f.write('NPPAll%s,%s\n' % (i, fdata[pftkey]['NPPAll']))
+      f.write('NUPTAKE%s,%s\n' % (i, fdata[pftkey]['TotNitrogenUptake']))
       f.write('VEGCL%s,%s\n' % (i, fdata[pftkey]['VegCarbon']['Leaf']))
       f.write('VEGCW%s,%s\n' % (i, fdata[pftkey]['VegCarbon']['Stem']))
       f.write('VEGCR%s,%s\n' % (i, fdata[pftkey]['VegCarbon']['Root']))
@@ -29,17 +36,25 @@ def main(args):
       f.write('VEGNL%s,%s\n' % (i, fdata[pftkey]['VegStructuralNitrogen']['Leaf']))
       f.write('VEGNW%s,%s\n' % (i, fdata[pftkey]['VegStructuralNitrogen']['Stem']))
       f.write('VEGNR%s,%s\n' % (i, fdata[pftkey]['VegStructuralNitrogen']['Root']))
-      f.write('VEGNSUM%s,%s\n' % (i, fdata[pftkey]['VegCarbon']['Leaf'] + fdata[pftkey]['VegCarbon']['Stem'] + fdata[pftkey]['VegCarbon']['Root']))
-      f.write('VEGLBLN%s,%s\n' % (i, fdata[pftkey]['VegLabileNitrogen']))
+      f.write('VEGNSUM%s,%s\n' % (i, fdata[pftkey]['VegStructuralNitrogen']['Leaf'] + fdata[pftkey]['VegStructuralNitrogen']['Stem'] + fdata[pftkey]['VegStructuralNitrogen']['Root']))
+    f.write('DMOSSC,%s\n' % (fdata['MossdeathCarbon']))
+    f.write('SHLWC,%s\n' % (fdata['CarbonShallow']))
+    f.write('DEEPC,%s\n' % (fdata['CarbonDeep']))
+    f.write('MINEC,%s\n' % (fdata['CarbonMineralSum']))
+    f.write('SOLN,%s\n' % (fdata['OrganicNitrogenSum']))
+    f.write('AVLN,%s\n' % (fdata['AvailableNitrogenSum']))
 
-  if (args.instructionfile is not None):
+
+  if ((args.instructionfile is not None) and (args.targets_file is not None) ):
     print "Writing instruction file to: %s" % (args.instructionfile)
     print "DOUBLE CHECK! --> instruction file must match simplified outputs!"
     with open(args.instructionfile, 'w') as f:
       f.write("pif @\n")
       for i in range(0,9):
-        f.write("l1 @,@ !GPPALL%s!\n" % (i))
+        f.write("l1 @,@ !GPPALLIN%s!\n" % (i))
+        f.write("l1 @,@ !NPPALLIN%s!\n" % (i))
         f.write("l1 @,@ !NPPALL%s!\n" % (i))
+        f.write("l1 @,@ !NUPTAKE%s!\n" % (i))
         f.write("l1 @,@ !VEGCL%s!\n" % (i))
         f.write("l1 @,@ !VEGCW%s!\n" % (i))
         f.write("l1 @,@ !VEGCR%s!\n" % (i))
@@ -48,7 +63,12 @@ def main(args):
         f.write("l1 @,@ !VEGNW%s!\n" % (i))
         f.write("l1 @,@ !VEGNR%s!\n" % (i))
         f.write("l1 @,@ !VEGNSUM%s!\n" % (i))
-        f.write("l1 @,@ !VEGLBLN%s!\n" % (i))
+      f.write("l1 @,@ !DMOSSC!\n")
+      f.write("l1 @,@ !SHLWC!\n")
+      f.write("l1 @,@ !DEEPC!\n")
+      f.write("l1 @,@ !MINEC!\n")
+      f.write("l1 @,@ !SOLN!\n")
+      f.write("l1 @,@ !AVLN!\n")
 
     # This seems a bit of a hack, but we need to 
     # replace the seconds line of the file with a l2 instead of l1
@@ -57,7 +77,7 @@ def main(args):
     with open(args.instructionfile, 'r') as f:
       data = f.readlines()
 
-    data[1] = "l2 @,@ !GPPALL0!\n"
+    data[1] = "l2 @,@ !GPPALLIN0!\n"
 
     with open(args.instructionfile, 'w') as f:
       f.writelines(data)
@@ -78,15 +98,18 @@ if __name__ == '__main__':
       Generates a simplified version of the model's json files. This
       is helpful for parsing with the PEST instruction files, as the
       PEST instruction files basically involve navigating by line and 
-      charachter position.
+      character position.
     ''')
   )
 
   parser.add_argument('file', 
-     help=textwrap.dedent('''The path/name of a simpliflied output file to generate.'''))
+     help=textwrap.dedent('''The path/name of a simplified output file to generate.'''))
 
   parser.add_argument('instructionfile', nargs="?",
      help=textwrap.dedent("The path/name of a corresponding instruction file."))
+
+  parser.add_argument('targets_file', nargs="?",
+     help=textwrap.dedent("The path/name of the target values file."))
  
   args = parser.parse_args()
   print args
